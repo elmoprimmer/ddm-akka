@@ -72,6 +72,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		int result;
 	}
 
+	public static class ShutdownMessage implements Message {
+		private static final long serialVersionIUD = 4522292372652568030L;
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -129,6 +133,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				.onMessage(HeaderMessage.class, this::handle)
 				.onMessage(RegistrationMessage.class, this::handle)
 				.onMessage(CompletionMessage.class, this::handle)
+				.onMessage(ShutdownMessage.class, this::handle)
 				.onSignal(Terminated.class, this::handle)
 				.build();
 	}
@@ -207,5 +212,9 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 		ActorRef<DependencyWorker.Message> dependencyWorker = signal.getRef().unsafeUpcast();
 		this.dependencyWorkers.remove(dependencyWorker);
 		return this;
+	}
+
+	private Behavior<Message> handle(ShutdownMessage message){
+		return Behaviors.stopped();
 	}
 }
