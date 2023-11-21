@@ -42,6 +42,10 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		int task;
 	}
 
+	public static class ShutdownMessage implements Message {
+		private static final long serialVersionUID = -4667742203356518160L; // I just edited some of these digits, idk if its the best way to do it.
+	}
+
 	////////////////////////
 	// Actor Construction //
 	////////////////////////
@@ -76,6 +80,7 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		return newReceiveBuilder()
 				.onMessage(ReceptionistListingMessage.class, this::handle)
 				.onMessage(TaskMessage.class, this::handle)
+				.onMessage(ShutdownMessage.class, this::handle)
 				.build();
 	}
 
@@ -101,5 +106,9 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 		this.largeMessageProxy.tell(new LargeMessageProxy.SendMessage(completionMessage, message.getDependencyMinerLargeMessageProxy()));
 
 		return this;
+	}
+
+	private Behavior<Message> handle(ShutdownMessage message) {
+		return Behaviors.stopped();
 	}
 }
