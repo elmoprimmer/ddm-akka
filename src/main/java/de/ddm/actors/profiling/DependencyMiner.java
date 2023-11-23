@@ -19,9 +19,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
@@ -121,6 +119,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private final List<ActorRef<DependencyWorker.Message>> dependencyWorkers;
 
+	private Map<Integer, Map<Integer, Set<String>>> fileIdToColToDataMap = new HashMap<>();
+
 	////////////////////
 	// Actor Behavior //
 	////////////////////
@@ -153,10 +153,26 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(BatchMessage message) {
-		// Ignoring batch content for now ... but I could do so much with it.
+		this.getContext().getLog().info(String.valueOf(message.id));
+		if (message.getBatch().size() != 0) {
+			int numOfColumns = message.batch.get(0).length;
+			int numOfRows = message.batch.size();
 
-		if (message.getBatch().size() != 0)
+			for (int i = 0; i < numOfColumns; i++){
+				Set<String> column = new TreeSet<>();
+				for (int j = 0; j < numOfRows; j++){
+
+					column.add(message.batch.get(j)[i]);
+
+				}
+
+				fileIdToColToDataMap.computeIfAbsent(message.id, k -> new HashMap<>())
+						.computeIfAbsent(i, k -> new TreeSet<>())
+						.addAll(column);
+			}
 			this.inputReaders.get(message.getId()).tell(new InputReader.ReadBatchMessage(this.getContext().getSelf()));
+		}
+
 		return this;
 	}
 
@@ -215,6 +231,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(ShutdownMessage message){
+		this.getContext().getLog().info(fileIdToColToDataMap.get(2).toString());
+
 		return Behaviors.stopped();
 	}
 }
