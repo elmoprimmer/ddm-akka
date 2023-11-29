@@ -14,9 +14,11 @@ import de.ddm.serialization.AkkaSerializable;
 import de.ddm.singletons.InputConfigurationSingleton;
 import de.ddm.singletons.SystemConfigurationSingleton;
 import de.ddm.structures.InclusionDependency;
+import de.ddm.actors.TaskArray;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
 
 import java.io.File;
 import java.util.*;
@@ -119,7 +121,13 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private final List<ActorRef<DependencyWorker.Message>> dependencyWorkers;
 
-	private Map<Integer, Map<Integer, Set<String>>> fileIdToColToDataMap = new HashMap<>();
+	private final Map<Integer, Map<Integer, TreeSet<String>>> fileIdToColToDataMap = new HashMap<>();
+
+	private final Map<String, TreeSet<String>> colToDataMap = new HashMap<>();
+
+	private TaskArray.Task[] tasks = TaskArray.generateTaskArray(colToDataMap);
+
+
 
 	////////////////////
 	// Actor Behavior //
@@ -153,26 +161,48 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(BatchMessage message) {
-		this.getContext().getLog().info(String.valueOf(message.id));
+		// if message is not empty
+
 		if (message.getBatch().size() != 0) {
 			int numOfColumns = message.batch.get(0).length;
 			int numOfRows = message.batch.size();
 
+			//for each column create new tree set
 			for (int i = 0; i < numOfColumns; i++){
+				this.getContext().getLog().info(String.valueOf(message.id));
+				this.getContext().getLog().info(String.valueOf(message.batch.size()));
+
+
 				Set<String> column = new TreeSet<>();
+				//add contents of each row to this tree set
 				for (int j = 0; j < numOfRows; j++){
-
 					column.add(message.batch.get(j)[i]);
-
 				}
-
+				//adds file id to hash map if it is not there yet and adds column (tree set) to the (new) hash map
 				fileIdToColToDataMap.computeIfAbsent(message.id, k -> new HashMap<>())
 						.computeIfAbsent(i, k -> new TreeSet<>())
 						.addAll(column);
 			}
 			this.inputReaders.get(message.getId()).tell(new InputReader.ReadBatchMessage(this.getContext().getSelf()));
 		}
+		else {
+			//once all data has been read, create hashmap of tree sets where the keys are (file ID:col ID)
+			for (Map.Entry<Integer, Map<Integer, TreeSet<String>>> outerEntry : fileIdToColToDataMap.entrySet()) {
+				Integer outerKey = outerEntry.getKey();
+				Map<Integer, TreeSet<String>> innerMap = outerEntry.getValue();
 
+				// iterate through each key in inner map (map of col id to data)
+				for (Map.Entry<Integer, TreeSet<String>> innerEntry : innerMap.entrySet()) {
+					Integer innerKey = innerEntry.getKey();
+					TreeSet<String> value = (TreeSet<String>) innerEntry.getValue();
+
+					// Combine column (tree set) keys with new syntax
+					colToDataMap.put(outerKey + ":" + innerKey, new TreeSet<>(value));
+
+				}
+			}
+			tasks = TaskArray.generateTaskArray(colToDataMap);
+		}
 		return this;
 	}
 
@@ -231,7 +261,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private Behavior<Message> handle(ShutdownMessage message){
-		this.getContext().getLog().info(fileIdToColToDataMap.get(2).toString());
+		this.getContext().getLog().info(colToDataMap.get("2:0").toString());
+		this.getContext().getLog().info(String.valueOf(colToDataMap.size()));
+		this.getContext().getLog().info(Arrays.toString(tasks));
+
 
 		return Behaviors.stopped();
 	}
