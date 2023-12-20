@@ -114,7 +114,6 @@ public class DependencyWorker extends AbstractBehavior<DependencyWorker.Message>
 	}
 
 	private Behavior<Message> handle(TaskMessage message) {
-		this.getContext().getLog().info("looking for work");
 		Set<ColID> requiredData = new HashSet<>();
 		// I should probably know how to solve this task, but for now I just pretend some work...
 		boolean doIHaveTheLeftData = this.myData.containsKey(message.task.left);
