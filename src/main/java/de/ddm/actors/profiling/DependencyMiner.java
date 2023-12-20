@@ -132,7 +132,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 	private final List<ActorRef<DependencyWorker.Message>> dependencyWorkers;
 
-	private final Map<Integer, Map<Integer, TreeSet<String>>> fileIdToColToDataMap = new HashMap<>();
+	private Map<Integer, Map<Integer, TreeSet<String>>> fileIdToColToDataMap = new HashMap<>();
 
 	private final Map<ColID, TreeSet<String>> colToDataMap = new HashMap<>();
 
@@ -143,6 +143,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	private boolean isDataReadingComplete = false;
 
 	private List<Integer> dependencies = new ArrayList<>();
+
+	private int finishedFiles = 0;
+
+	private int tasksFinished = 0;
 
 	Map<ActorRef<DependencyWorker.Message>, List<DependencyWorker.TaskMessage>> actorRefToActorOccupationMap = new HashMap<>();
 	////////////////////
@@ -221,10 +225,24 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 			tasks = TaskArray.generateTaskArray(colToDataMap);
 
 		}
-		isDataReadingComplete = true;
-		assignTasksToAllWorkers();
+		if (message.getBatch().size() == 0) {
+			isDataReadingComplete();
+		}
+		if (isDataReadingComplete){
+			this.getContext().getLog().info("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+			assignTasksToAllWorkers();
+		}
 		return this;
 	}
+	private void isDataReadingComplete(){
+		finishedFiles++;
+		if (finishedFiles == inputFiles.length){
+			isDataReadingComplete = true;
+			fileIdToColToDataMap = null;
+
+		}
+	}
+
 
 	private Behavior<Message> handle(RegistrationMessage message) {
 		ActorRef<DependencyWorker.Message> dependencyWorker = message.getDependencyWorker();
@@ -275,6 +293,7 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 
 			}
 		}
+		tasksFinished++;
 
 		// I still don't know what task the worker could help me to solve ... but let me keep her busy.
 		// Once I found all unary INDs, I could check if this.discoverNaryDependencies is set to true and try to detect n-ary INDs as well!
@@ -379,15 +398,10 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 	}
 
 	private boolean allTasksCompleted() {
-		for (TaskArray.Task task : tasks) {
-			if (!task.checked) {
-				return false;
-			}
-		}
-		this.getContext().getLog().info("all tasks completed");
-		this.getContext().getLog().info(Arrays.toString(tasks));
 
-		return true;
+		this.getContext().getLog().info("all tasks completed");
+
+		return tasksFinished == tasks.length;
 	}
 
 	private void end() {
@@ -416,8 +430,8 @@ public class DependencyMiner extends AbstractBehavior<DependencyMiner.Message> {
 				b.add(task.id);
 			}
 		}
-		this.getContext().getLog().info(c.toString());
-		this.getContext().getLog().info(b.toString());
+		this.getContext().getLog().info(String.valueOf(tasksFinished));
+		//this.getContext().getLog().info(b.toString());
 
 
 		return Behaviors.stopped();
